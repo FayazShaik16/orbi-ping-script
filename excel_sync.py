@@ -304,6 +304,11 @@ class ExcelSyncManager:
             chart.width = 18
             chart.height = 11
 
+            # Explicit 0% - 100% range on Y-Axis with 10% step increments
+            chart.y_axis.scaling.min = 0
+            chart.y_axis.scaling.max = 100
+            chart.y_axis.majorUnit = 10
+
             data_ref = Reference(ws, min_col=4, min_row=header_row, max_row=data_end_row)
             cats_ref = Reference(ws, min_col=1, min_row=data_start_row, max_row=data_end_row)
             chart.add_data(data_ref, titles_from_data=True)

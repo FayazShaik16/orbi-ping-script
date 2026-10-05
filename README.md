@@ -72,6 +72,7 @@ At the bottom of each sheet, a 1-hour breakdown table and a native Excel Bar Cha
   - `Avg Packet Loss (%)`
 - **Native Excel Bar Graph**:
   - Visualizes the average packet loss percentage for each 1-hour interval.
+  - **Fixed Y-Axis Scale**: Ranged from **0% to 100%** with **10%** major step intervals (`0%`, `10%`, `20%` ... `100%`) for standardized, consistent visual comparisons across all sheets and tests.
   - Placed right below the hourly table for executive reporting and visual analysis.
 
 ---
