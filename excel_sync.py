@@ -24,6 +24,7 @@ import time
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import BarChart, Reference
+from openpyxl.chart.label import DataLabelList
 try:
     from openpyxl.drawing.image import Image as OpenpyxlImage
     from PIL import Image as PILImage, ImageDraw, ImageFont
@@ -475,10 +476,18 @@ class ExcelSyncManager:
             chart.width = 18
             chart.height = 11
 
-            # Explicit 0% - 100% range on Y-Axis with 10% step increments
+            # Exact Y-Axis Range: Min 0, Max 100, Major Steps 10, Minor Steps 1
             chart.y_axis.scaling.min = 0
             chart.y_axis.scaling.max = 100
             chart.y_axis.majorUnit = 10
+            chart.y_axis.minorUnit = 1
+            chart.y_axis.tickLblPos = "nextTo"
+            chart.y_axis.delete = False
+            chart.y_axis.number_format = '0'
+
+            # Value labels on bars
+            chart.dataLabels = DataLabelList()
+            chart.dataLabels.showVal = True
 
             data_ref = Reference(ws, min_col=4, min_row=header_row, max_row=summary_end_row)
             cats_ref = Reference(ws, min_col=1, min_row=data_start_row, max_row=summary_end_row)
@@ -487,19 +496,6 @@ class ExcelSyncManager:
 
             chart_cell = f"A{summary_end_row + 2}"
             ws.add_chart(chart, chart_cell)
-
-            # Also render a high-resolution chart image for universal viewing
-            # (Guarantees chart displays in Apple Numbers, web viewers, and apps where openpyxl chart objects are unsupported)
-            if PIL_AVAILABLE:
-                try:
-                    img_path = self._render_barchart_image(hourly_buckets, sheet_name)
-                    if img_path and os.path.exists(img_path):
-                        xl_img = OpenpyxlImage(img_path)
-                        xl_img.width = 750
-                        xl_img.height = 380
-                        ws.add_image(xl_img, chart_cell)
-                except Exception as img_err:
-                    sys.stderr.write(f"[Chart Image Warning] {img_err}\n")
 
         self._atomic_save()
         return self.stats
