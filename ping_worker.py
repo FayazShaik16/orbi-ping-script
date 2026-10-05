@@ -114,8 +114,8 @@ def run_local_ping_worker(sheet_name, node_type, target, interval, duration, jou
 
             if is_success:
                 received += 1
-                loss_field = "NA"
-                display_str = f"[{ts_str}] Reply from {target}: seq={transmitted} time={elapsed_ms:.1f}ms TTL={ttl_val} (Loss: NA)"
+                loss_field = 0
+                display_str = f"[{ts_str}] Reply from {target}: seq={transmitted} time={elapsed_ms:.1f}ms TTL={ttl_val} (Loss: 0)"
                 print(f"{COLOR_GREEN}{display_str}{COLOR_RESET}")
             else:
                 loss_counter += 1
@@ -225,8 +225,8 @@ def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh
 
             if is_success:
                 received += 1
-                loss_field = "NA"
-                display_str = f"[{ts_str}] Reply from {target}: seq={transmitted} {line} TTL={ttl_val} (Loss: NA)"
+                loss_field = 0
+                display_str = f"[{ts_str}] Reply from {target}: seq={transmitted} {line} TTL={ttl_val} (Loss: 0)"
                 print(f"{COLOR_GREEN}{display_str}{COLOR_RESET}")
             else:
                 loss_counter += 1

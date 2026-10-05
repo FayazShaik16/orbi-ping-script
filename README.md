@@ -59,7 +59,7 @@ Each sheet features an executive summary at the very top (pinned via freeze pane
 | :--- | :--- | :--- |
 | **`Time stamp`** | Millisecond-accurate timestamp | `2026-10-05 18:25:01.345` |
 | **`Mesh Node Type`** | Node context (`Base`, `Satellite1`, `Satellite2`) | `Base` |
-| **`PacketLoss`** | `NA` if ping reply received; incrementing integer counter if timed out / dropped | `NA` or `1`, `2`, `3`... |
+| **`PacketLoss`** | `0` if ping reply received; incrementing integer counter if timed out / dropped | `0` or `1`, `2`, `3`... |
 | **`TTL`** | Time-To-Live integer value from the ping response (`NA` on failure) | `117` or `64` |
 | **`String`** | Full raw ping output string returned | `64 bytes from 8.8.8.8: seq=1 ttl=117 time=14.2 ms` |
 

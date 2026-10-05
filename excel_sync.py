@@ -189,13 +189,22 @@ class ExcelSyncManager:
                         except (ValueError, TypeError):
                             ttl_out = ttl_val
 
-                        ws.append([ts_val, node_val, loss_val, ttl_out, str_val])
+                        # Parse packet loss: 0 on success, positive integer on loss/failure
+                        loss_clean = str(loss_val).strip().upper()
+                        if loss_clean == "NA" or loss_clean == "" or loss_clean == "0":
+                            loss_out = 0
+                        else:
+                            try:
+                                loss_out = int(loss_clean)
+                            except ValueError:
+                                loss_out = loss_clean
+
+                        ws.append([ts_val, node_val, loss_out, ttl_out, str_val])
                         total_new_rows += 1
 
                         # Update in-memory stats
                         self.stats[sheet_name]["total"] += 1
-                        loss_clean = str(loss_val).strip().upper()
-                        if loss_clean != "NA" and loss_clean != "":
+                        if loss_out != 0 and loss_clean != "0":
                             self.stats[sheet_name]["losses"] += 1
 
                     self.offsets[sheet_name] = f.tell()
@@ -411,7 +420,7 @@ class ExcelSyncManager:
                         continue
                     ts_str = r[0]
                     loss_str = str(r[2]).strip().upper()
-                    is_loss = (loss_str != "NA" and loss_str != "")
+                    is_loss = (loss_str not in ["NA", "", "0"])
                     rows.append((ts_str, is_loss))
         except Exception:
             return []
