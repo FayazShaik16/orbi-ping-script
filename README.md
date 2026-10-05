@@ -54,14 +54,23 @@ Each sheet features an executive summary at the very top (pinned via freeze pane
 - **Row 2**: `Packet Loss : <Percentage>%` &nbsp;|&nbsp; `Packet Loss Count : <Total Loss Count>`
 *(Updates dynamically in real time as pings arrive)*
 
-### Column Headers (Row 4):
+### Column Headers (Row 4) & Excel AutoFilter:
+Excel **AutoFilter** is automatically enabled across row 4 headers (`A4:F`), enabling 1-click dropdown filtering by hour, node type, packet loss, or TTL.
+
 | Column Name | Description | Example |
 | :--- | :--- | :--- |
 | **`Time stamp`** | Millisecond-accurate timestamp | `2026-10-05 18:25:01.345` |
+| **`Hour`** | Test hour window identifier for 1-click Excel filtering | `Hour 1`, `Hour 2`... |
 | **`Mesh Node Type`** | Node context (`Base`, `Satellite1`, `Satellite2`) | `Base` |
 | **`PacketLoss`** | `0` if ping reply received; incrementing integer counter if timed out / dropped | `0` or `1`, `2`, `3`... |
 | **`TTL`** | Time-To-Live integer value from the ping response (`NA` on failure) | `117` or `64` |
 | **`String`** | Full raw ping output string returned | `64 bytes from 8.8.8.8: seq=1 ttl=117 time=14.2 ms` |
+
+### Hourly Separator Banner Rows:
+At the start of every 1-hour window, a styled divider banner row is inserted across the data table:
+- **Visual Styling**: Dark navy fill (`#1F4E79`), bold white text, distinct borders.
+- **Content**: `=== HOUR <N> (<Start_Time> - <End_Time>) ===`
+- **Filter-Compatible**: Unmerged cells ensure full compatibility with Excel AutoFilter, sorting, and keyboard navigation.
 
 ### Hourly Breakdown Table & Bar Graph (Bottom of Sheet):
 At the bottom of each sheet, a 1-hour breakdown table and a native Excel Bar Chart are automatically generated:

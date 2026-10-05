@@ -12,7 +12,7 @@ Launches 6 terminal tabs / windows on the Main Client (connected to Base Node 77
 
 Data Persistence & Excel Architecture:
 - Creates a SINGLE master Excel file with 6 distinct sheets.
-- Sheet Columns: Time stamp | Mesh Node Type | PacketLoss | String
+- Sheet Columns: Time stamp | Hour | Mesh Node Type | PacketLoss | TTL | String
 - Instantaneous persistence: Every single ping in every terminal is immediately
   flushed and fsynced to disk in its session journal CSV.
 - Simultaneously, a background synchronization worker syncs incoming ping rows
