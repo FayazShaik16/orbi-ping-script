@@ -23,6 +23,12 @@ import time
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.chart import BarChart, Reference
+try:
+    from openpyxl.drawing.image import Image as OpenpyxlImage
+    from PIL import Image as PILImage, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 SHEET_CONFIG = [
     {"name": "Base_Internet", "node_type": "Base", "title": "Base Node Client -> Internet (8.8.8.8)"},
@@ -317,8 +323,76 @@ class ExcelSyncManager:
             chart_cell = f"A{data_end_row + 2}"
             ws.add_chart(chart, chart_cell)
 
+            # Also render a high-resolution chart image for universal viewing
+            # (Guarantees chart displays in Apple Numbers, web viewers, and apps where openpyxl chart objects are unsupported)
+            if PIL_AVAILABLE:
+                try:
+                    img_path = self._render_barchart_image(hourly_buckets, sheet_name)
+                    if img_path and os.path.exists(img_path):
+                        xl_img = OpenpyxlImage(img_path)
+                        xl_img.width = 750
+                        xl_img.height = 380
+                        ws.add_image(xl_img, chart_cell)
+                except Exception as img_err:
+                    sys.stderr.write(f"[Chart Image Warning] {img_err}\n")
+
         self._atomic_save()
         return self.stats
+
+    def _render_barchart_image(self, hourly_data, sheet_name):
+        """
+        Renders a crisp, high-resolution PNG bar chart of hourly packet loss with
+        a fixed 0% - 100% Y-axis (10% steps) and embeds it into the spreadsheet.
+        """
+        w, h = 900, 480
+        img = PILImage.new("RGB", (w, h), color="#FFFFFF")
+        draw = ImageDraw.Draw(img)
+
+        # Header bar
+        draw.rectangle([(0, 0), (w, 55)], fill="#1F4E79")
+        draw.text((25, 18), f"Average Packet Loss per 1 Hour - {sheet_name}", fill="#FFFFFF")
+
+        ml = 75
+        mr = 35
+        mt = 85
+        mb = 80
+        pw = w - ml - mr
+        ph = h - mt - mb
+
+        # Y-Axis 0% to 100% with 10% steps
+        for pct in range(0, 101, 10):
+            y = mt + ph - int(pct / 100.0 * ph)
+            draw.line([(ml, y), (w - mr, y)], fill="#EEEEEE" if pct > 0 else "#333333", width=1)
+            draw.text((ml - 48, y - 7), f"{pct:>3}%", fill="#555555")
+
+        draw.line([(ml, mt), (ml, mt + ph)], fill="#333333", width=2)
+        draw.line([(ml, mt + ph), (w - mr, mt + ph)], fill="#333333", width=2)
+
+        draw.text((ml, mt - 22), "Packet Loss (%)", fill="#1F4E79")
+        draw.text((w // 2 - 40, mt + ph + 45), "1-Hour Time Window", fill="#1F4E79")
+
+        n = len(hourly_data)
+        if n > 0:
+            bar_w = min(75, max(24, int(pw / (n * 1.6))))
+            step = pw / n
+            for idx, (label, total, loss, pct) in enumerate(hourly_data):
+                xc = ml + idx * step + step / 2
+                x1 = xc - bar_w / 2
+                x2 = xc + bar_w / 2
+                bh = int(min(pct, 100.0) / 100.0 * ph)
+                y1 = mt + ph - bh
+                y2 = mt + ph
+
+                bar_color = "#C0392B" if pct > 0 else "#27AE60"
+                draw.rectangle([(x1, y1), (x2, y2)], fill=bar_color, outline="#2C3E50", width=1)
+
+                val_str = f"{pct:.1f}%"
+                draw.text((x1, max(mt, y1 - 16)), val_str, fill=bar_color)
+                draw.text((x1, mt + ph + 8), label, fill="#222222")
+
+        temp_img = os.path.join(tempfile.gettempdir(), f"chart_{sheet_name}_{os.getpid()}.png")
+        img.save(temp_img)
+        return temp_img
 
     def _compute_hourly_buckets(self, csv_path):
         """
