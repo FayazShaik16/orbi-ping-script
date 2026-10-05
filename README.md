@@ -1,0 +1,138 @@
+# Netgear Orbi 771/770 Mesh Testbed - 6 Ping Terminal Launcher & Live Excel Reporter
+
+Cross-platform testbed orchestration tool that opens **6 concurrent terminal sessions** (tabs/windows) on the **Main Client** (connected to the Base Node RBE771 via LAN cable) and continuously records data into a **single Master Excel workbook with 6 distinct sheets**.
+
+---
+
+## Architecture Overview
+
+```
+                      [ INTERNET (8.8.8.8) ]
+                                |
+                   +--------------------------+
+                   |   Base Node (Orbi 771)   |
+                   +--------------------------+
+                     /                      \
+      (Wireless MLO Backhaul)        (Wireless MLO Backhaul)
+                   /                          \
++-------------------------+        +-------------------------+
+|  Satellite 1 (Orbi 770) |        |  Satellite 2 (Orbi 770) |
++-------------------------+        +-------------------------+
+             |                                  |
+         (LAN Cable)                        (LAN Cable)
+             |                                  |
+     [ Client 2 Laptop ]                [ Client 3 Laptop ]
+
+===============================================================
+                MAIN CLIENT (Connected to Base Node)
+===============================================================
+  Tab 1: Base Client -> 8.8.8.8 (Internet)
+  Tab 2: Base Client -> Local Client IP (Self Ping)
+  Tab 3: Base Client -> Satellite-1 IP
+  Tab 4: Base Client -> Satellite-2 IP
+  Tab 5: Satellite-1 (via SSH) -> 8.8.8.8 (Internet)
+  Tab 6: Satellite-2 (via SSH) -> 8.8.8.8 (Internet)
+===============================================================
+             || (Simultaneous & Real-Time Sync)
+             \/
+[ Master Excel File: orbi_mesh_ping_<timestamp>.xlsx ]
+  - Sheet 1: Base_Internet
+  - Sheet 2: Base_Self
+  - Sheet 3: Base_Satellite1
+  - Sheet 4: Base_Satellite2
+  - Sheet 5: Satellite1_Internet
+  - Sheet 6: Satellite2_Internet
+```
+
+---
+
+## Excel Structure & Exact Layout
+
+### 2-Row Sheet Header Summary:
+Each sheet features an executive summary at the very top (pinned via freeze panes):
+- **Row 1**: `SheetName (TestCase): <SheetName> (<TestCase Details>)`
+- **Row 2**: `Packet Loss : <Percentage>%` &nbsp;|&nbsp; `Packet Loss Count : <Total Loss Count>`
+*(Updates dynamically in real time as pings arrive)*
+
+### Column Headers (Row 4):
+| Column Name | Description | Example |
+| :--- | :--- | :--- |
+| **`Time stamp`** | Millisecond-accurate timestamp | `2026-10-05 18:25:01.345` |
+| **`Mesh Node Type`** | Node context (`Base`, `Satellite1`, `Satellite2`) | `Base` |
+| **`PacketLoss`** | `NA` if ping reply received; incrementing integer counter if timed out / dropped | `NA` or `1`, `2`, `3`... |
+| **`TTL`** | Time-To-Live integer value from the ping response (`NA` on failure) | `117` or `64` |
+| **`String`** | Full raw ping output string returned | `64 bytes from 8.8.8.8: seq=1 ttl=117 time=14.2 ms` |
+
+---
+
+## Instantaneous Persistence Guarantee (Crash-Proof)
+To protect against system crashes, power loss, or sudden disconnects:
+1. **Direct Disk Fsyncing**: Every terminal immediately writes each ping row to a session journal CSV with `flush()` and `os.fsync()`. Even if the power is cut at any millisecond, 100% of data up to that exact instant is physically committed to storage.
+2. **Atomic Excel Saving**: A background sync worker updates the master Excel file in real-time every second using atomic file replacement (`.tmp` swap to `.xlsx`). The `.xlsx` file is never corrupted mid-write.
+3. **Emergency Recovery Command**: If the machine reboots mid-test, you can regenerate/verify the full Excel workbook from the crash journals at any time:
+   ```bash
+   python3 orbi_mesh_ping.py --sync-excel ./ping_logs/session_<timestamp>
+   ```
+
+---
+
+## Multi-OS Terminal Support
+- **macOS**: Opens 6 tabs in `Terminal.app` via AppleScript.
+- **Linux**: Opens 6 tabs in `gnome-terminal`, or creates a `tmux` session with 6 windows, or `xterm`.
+- **Windows**: Opens 6 tabs in **Windows Terminal** (`wt.exe`) or separate `cmd.exe` windows.
+
+---
+
+## How to Run
+
+### 1. Interactive Mode
+Run without arguments to configure parameters step-by-step:
+```bash
+python3 orbi_mesh_ping.py
+```
+
+### 2. Command-Line Execution
+```bash
+# Run for 2 hours:
+python3 orbi_mesh_ping.py --duration 2h
+
+# Run for 1.5 hours with 100ms interval:
+python3 orbi_mesh_ping.py --duration 1.5h --interval 0.1
+
+# Run for 30 minutes:
+python3 orbi_mesh_ping.py --duration 30m
+
+# Run continuously until Ctrl+C:
+python3 orbi_mesh_ping.py --duration 0
+```
+
+### Full Example with Options:
+```bash
+python3 orbi_mesh_ping.py \
+  --os macos \
+  --duration 2h \
+  --interval 0.1 \
+  --sat1-ip 192.168.1.10 \
+  --sat2-ip 192.168.1.11 \
+  --ssh-user root \
+  --log-dir ./ping_logs
+```
+
+### All CLI Options:
+```
+  --os {macos,linux,windows}   Operating System of Main Client (default: auto-detected)
+  --interval INTERVAL          Ping interval in seconds (default: 0.1 = 100ms)
+  --duration DURATION          Ping duration: e.g. 2h (2 hours), 1.5h, 30m, 120s, or 0 (continuous)
+  --sat1-ip SAT1_IP            IP address of Satellite-1 (default: 192.168.1.10)
+  --sat2-ip SAT2_IP            IP address of Satellite-2 (default: 192.168.1.11)
+  --base-ip BASE_IP            IP address of Base Node (default: 192.168.1.1)
+  --client-ip CLIENT_IP        Self IP to ping (defaults to auto-detected local IP)
+  --internet-ip INTERNET_IP    Internet target to ping (default: 8.8.8.8)
+  --ssh-user SSH_USER          SSH username for satellites (default: root)
+  --ssh-port SSH_PORT          SSH port (default: 22)
+  --ssh-key SSH_KEY            Path to SSH private key file
+  --ssh-pass SSH_PASS          SSH password (optional)
+  --log-dir LOG_DIR            Folder to store session journals and Excel reports
+  --excel-file EXCEL_FILE      Custom filename/path for output Excel file
+  --sync-excel JOURNAL_DIR     Rebuild/recover Excel report from an existing journal folder
+```

@@ -1,0 +1,16 @@
+# Logs and session journals
+ping_logs/
+*.csv
+*.xlsx
+.tmp_*
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment / OS
+.DS_Store
+.vscode/
+.idea/
