@@ -63,6 +63,17 @@ Each sheet features an executive summary at the very top (pinned via freeze pane
 | **`TTL`** | Time-To-Live integer value from the ping response (`NA` on failure) | `117` or `64` |
 | **`String`** | Full raw ping output string returned | `64 bytes from 8.8.8.8: seq=1 ttl=117 time=14.2 ms` |
 
+### Hourly Breakdown Table & Bar Graph (Bottom of Sheet):
+At the bottom of each sheet, a 1-hour breakdown table and a native Excel Bar Chart are automatically generated:
+- **Hourly Breakdown Table**:
+  - `Hour Window` (e.g. `Hour 1 (18:00 - 19:00)`, `Hour 2 (19:00 - 20:00)`)
+  - `Total Pings`
+  - `Loss Count`
+  - `Avg Packet Loss (%)`
+- **Native Excel Bar Graph**:
+  - Visualizes the average packet loss percentage for each 1-hour interval.
+  - Placed right below the hourly table for executive reporting and visual analysis.
+
 ---
 
 ## Instantaneous Persistence Guarantee (Crash-Proof)

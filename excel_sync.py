@@ -22,6 +22,7 @@ import tempfile
 import time
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.chart import BarChart, Reference
 
 SHEET_CONFIG = [
     {"name": "Base_Internet", "node_type": "Base", "title": "Base Node Client -> Internet (8.8.8.8)"},
@@ -239,10 +240,146 @@ class ExcelSyncManager:
                     pass
 
     def finalize(self):
-        """Performs a thorough final sync and logs summary."""
+        """
+        Performs final sync, appends the Hourly Packet Loss Breakdown table,
+        and generates a native Bar Chart showing average packet loss for each 1 hour
+        at the bottom of each sheet.
+        """
         self.sync_once()
+
+        for sheet_name, csv_path in self.journal_map.items():
+            if not os.path.exists(csv_path):
+                continue
+
+            ws = self.wb[sheet_name]
+            hourly_buckets = self._compute_hourly_buckets(csv_path)
+
+            if not hourly_buckets:
+                continue
+
+            # Add spacing and Hourly Summary section at bottom of sheet
+            ws.append([])
+            ws.append(["--- HOURLY PACKET LOSS BREAKDOWN (1 HOUR INTERVALS) ---", "", "", ""])
+            title_row = ws.max_row
+            ws.cell(row=title_row, column=1).font = Font(name="Calibri", size=11, bold=True, color="1F4E79")
+
+            # Table Header
+            table_header = ["Hour Window", "Total Pings", "Loss Count", "Avg Packet Loss (%)"]
+            ws.append(table_header)
+            header_row = ws.max_row
+
+            header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            for col_idx in range(1, 5):
+                cell = ws.cell(row=header_row, column=col_idx)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center" if col_idx in [2, 3, 4] else "left")
+
+            # Append hourly data rows
+            data_start_row = header_row + 1
+            for label, total, losses, loss_pct in hourly_buckets:
+                ws.append([label, total, losses, loss_pct])
+                curr_row = ws.max_row
+                ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="left")
+                ws.cell(row=curr_row, column=2).alignment = Alignment(horizontal="center")
+                ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
+                cell_pct = ws.cell(row=curr_row, column=4)
+                cell_pct.alignment = Alignment(horizontal="center")
+                if losses > 0:
+                    cell_pct.font = Font(name="Calibri", size=11, bold=True, color="C0392B")
+                else:
+                    cell_pct.font = Font(name="Calibri", size=11, bold=True, color="27AE60")
+
+            data_end_row = ws.max_row
+
+            # Build and insert Bar Chart
+            chart = BarChart()
+            chart.type = "col"
+            chart.style = 10
+            chart.title = f"Average Packet Loss per 1 Hour - {sheet_name}"
+            chart.y_axis.title = "Packet Loss (%)"
+            chart.x_axis.title = "1-Hour Time Window"
+            chart.legend = None
+            chart.width = 18
+            chart.height = 11
+
+            data_ref = Reference(ws, min_col=4, min_row=header_row, max_row=data_end_row)
+            cats_ref = Reference(ws, min_col=1, min_row=data_start_row, max_row=data_end_row)
+            chart.add_data(data_ref, titles_from_data=True)
+            chart.set_categories(cats_ref)
+
+            chart_cell = f"A{data_end_row + 2}"
+            ws.add_chart(chart, chart_cell)
+
         self._atomic_save()
         return self.stats
+
+    def _compute_hourly_buckets(self, csv_path):
+        """
+        Parses all rows in a journal CSV and groups them into 1-hour interval buckets
+        starting from the first ping's timestamp.
+        """
+        from datetime import datetime, timedelta
+
+        rows = []
+        try:
+            with open(csv_path, "r", encoding="utf-8", errors="replace") as f:
+                reader = csv.reader(f)
+                header = next(reader, None)
+                for r in reader:
+                    if not r or len(r) < 3:
+                        continue
+                    ts_str = r[0]
+                    loss_str = str(r[2]).strip().upper()
+                    is_loss = (loss_str != "NA" and loss_str != "")
+                    rows.append((ts_str, is_loss))
+        except Exception:
+            return []
+
+        if not rows:
+            return []
+
+        t0 = None
+        for ts_str, _ in rows:
+            try:
+                t0 = datetime.strptime(ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+                break
+            except Exception:
+                continue
+
+        if not t0:
+            return []
+
+        buckets = []
+        for ts_str, is_loss in rows:
+            try:
+                t = datetime.strptime(ts_str.split(".")[0], "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                continue
+
+            diff_sec = (t - t0).total_seconds()
+            if diff_sec < 0:
+                diff_sec = 0
+            hour_idx = int(diff_sec // 3600)
+
+            while len(buckets) <= hour_idx:
+                idx = len(buckets)
+                start_hr = t0 + timedelta(hours=idx)
+                end_hr = t0 + timedelta(hours=idx + 1)
+                b_name = f"Hour {idx + 1} ({start_hr.strftime('%H:%M')} - {end_hr.strftime('%H:%M')})"
+                buckets.append({"label": b_name, "total": 0, "loss": 0})
+
+            buckets[hour_idx]["total"] += 1
+            if is_loss:
+                buckets[hour_idx]["loss"] += 1
+
+        results = []
+        for b in buckets:
+            pct = (b["loss"] / b["total"] * 100.0) if b["total"] > 0 else 0.0
+            results.append((b["label"], b["total"], b["loss"], round(pct, 2)))
+
+        return results
 
 
 def run_standalone_sync(journal_dir, excel_path):
@@ -257,9 +394,15 @@ def run_standalone_sync(journal_dir, excel_path):
         print(f"[!] No journal CSV files found in {journal_dir}")
         return
 
+    # If rebuilding from journals, remove stale existing file to prevent row duplication
+    if os.path.exists(excel_path):
+        try:
+            os.remove(excel_path)
+        except Exception:
+            pass
+
     print(f"[*] Synchronizing {len(journal_map)} sheets into: {excel_path}...")
     manager = ExcelSyncManager(excel_path, journal_map)
-    manager.sync_once()
     stats = manager.finalize()
 
     print("[+] Synchronization complete!\n")
