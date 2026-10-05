@@ -53,7 +53,7 @@ class ExcelSyncManager:
         self.journal_map = journal_map
         self.offsets = {sheet: 0 for sheet in journal_map}
         self.wb = None
-        self.stats = {sheet: {"total": 0, "losses": 0} for sheet in journal_map}
+        self.stats = {sheet: {"total": 0, "losses": 0, "loss_hours": set()} for sheet in journal_map}
         self.sheet_t0 = {}
         self.sheet_current_hour = {}
 
@@ -109,8 +109,8 @@ class ExcelSyncManager:
             s_name = cfg["name"]
             if s_name in self.wb.sheetnames:
                 ws_test = self.wb[s_name]
-                # If sheet exists with old layout (A1 is not SheetName: or B4 is not Hour), remove and recreate
-                if ws_test["A1"].value != "SheetName (TestCase):" or ws_test["B4"].value != "Hour":
+                # If sheet exists with old layout (A1 is not SheetName:, B4 is not Hour, or E2 is not Packet Loss Hour(s) :), remove and recreate
+                if ws_test["A1"].value != "SheetName (TestCase):" or ws_test["B4"].value != "Hour" or ws_test["E2"].value != "Packet Loss Hour(s) :":
                     self.wb.remove(ws_test)
 
             if s_name not in self.wb.sheetnames:
@@ -122,15 +122,19 @@ class ExcelSyncManager:
                 ws["A1"].font = label_font
                 ws["B1"].font = val_font
 
-                # Summary Row 2: Packet Loss Percentage & Packet Loss Count
+                # Summary Row 2: Packet Loss Percentage, Packet Loss Count & Packet Loss Hour(s)
                 ws["A2"] = "Packet Loss :"
                 ws["B2"] = "0.00%"
                 ws["C2"] = "Packet Loss Count :"
                 ws["D2"] = 0
+                ws["E2"] = "Packet Loss Hour(s) :"
+                ws["F2"] = "None"
                 ws["A2"].font = label_font
                 ws["B2"].font = Font(name="Calibri", size=11, bold=True, color="27AE60")
                 ws["C2"].font = label_font
                 ws["D2"].font = val_font
+                ws["E2"].font = label_font
+                ws["F2"].font = Font(name="Calibri", size=11, bold=True, color="27AE60")
 
                 # Row 3 is a blank row separator
                 ws.append([])
@@ -150,7 +154,7 @@ class ExcelSyncManager:
                 ws.column_dimensions["B"].width = 14
                 ws.column_dimensions["C"].width = 18
                 ws.column_dimensions["D"].width = 15
-                ws.column_dimensions["E"].width = 12
+                ws.column_dimensions["E"].width = 22
                 ws.column_dimensions["F"].width = 65
                 ws.freeze_panes = "A5"
                 ws.auto_filter.ref = "A4:F4"
@@ -324,6 +328,7 @@ class ExcelSyncManager:
                         self.stats[sheet_name]["total"] += 1
                         if loss_out != 0 and loss_clean != "0":
                             self.stats[sheet_name]["losses"] += 1
+                            self.stats[sheet_name]["loss_hours"].add(hour_idx)
 
                     self.offsets[sheet_name] = f.tell()
 
@@ -338,6 +343,29 @@ class ExcelSyncManager:
 
                 ws["B2"].value = f"{loss_pct:.2f}%"
                 ws["D2"].value = loss_cnt
+
+                loss_hours = sorted(self.stats[sheet_name]["loss_hours"])
+                if not loss_hours:
+                    ws["F2"].value = "None"
+                    ws["F2"].font = Font(name="Calibri", size=11, bold=True, color="27AE60")
+                else:
+                    t0 = self.sheet_t0.get(sheet_name)
+                    if t0:
+                        desc_items = []
+                        for h_idx in loss_hours:
+                            s_t = (t0 + timedelta(hours=h_idx)).strftime('%H:%M')
+                            e_t = (t0 + timedelta(hours=h_idx + 1)).strftime('%H:%M')
+                            desc_items.append(f"Hour {h_idx + 1} ({s_t} - {e_t})")
+                        detailed_str = ", ".join(desc_items)
+                        if len(detailed_str) <= 60:
+                            loss_hours_str = detailed_str
+                        else:
+                            loss_hours_str = ", ".join(f"Hour {h_idx + 1}" for h_idx in loss_hours)
+                    else:
+                        loss_hours_str = ", ".join(f"Hour {h_idx + 1}" for h_idx in loss_hours)
+
+                    ws["F2"].value = loss_hours_str
+                    ws["F2"].font = Font(name="Calibri", size=11, bold=True, color="C0392B")
 
                 if loss_cnt > 0:
                     ws["B2"].font = Font(name="Calibri", size=11, bold=True, color="C0392B")
@@ -625,11 +653,13 @@ def run_standalone_sync(journal_dir, excel_path):
     stats = manager.finalize()
 
     print("[+] Synchronization complete!\n")
-    print(f"{'Sheet Name':<25} {'Total Pings':<15} {'Packet Losses':<15}")
-    print("-" * 55)
+    print(f"{'Sheet Name':<25} {'Total Pings':<14} {'Packet Losses':<14} {'Loss Hour(s)':<25}")
+    print("-" * 80)
     for s_name, data in stats.items():
-        print(f"{s_name:<25} {data['total']:<15} {data['losses']:<15}")
-    print("-" * 55)
+        loss_hrs = sorted(data.get("loss_hours", []))
+        hrs_str = ", ".join(f"Hour {h+1}" for h in loss_hrs) if loss_hrs else "None"
+        print(f"{s_name:<25} {data['total']:<14} {data['losses']:<14} {hrs_str:<25}")
+    print("-" * 80)
 
 
 def main():

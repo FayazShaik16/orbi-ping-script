@@ -51,8 +51,8 @@ Cross-platform testbed orchestration tool that opens **6 concurrent terminal ses
 ### 2-Row Sheet Header Summary:
 Each sheet features an executive summary at the very top (pinned via freeze panes):
 - **Row 1**: `SheetName (TestCase): <SheetName> (<TestCase Details>)`
-- **Row 2**: `Packet Loss : <Percentage>%` &nbsp;|&nbsp; `Packet Loss Count : <Total Loss Count>`
-*(Updates dynamically in real time as pings arrive)*
+- **Row 2**: `Packet Loss : <Percentage>%` &nbsp;|&nbsp; `Packet Loss Count : <Total Loss Count>` &nbsp;|&nbsp; `Packet Loss Hour(s) : <Hour(s) with Loss>` (or `None`)
+*(Updates dynamically in real time as pings arrive; highlights in green if None, bold red if losses occurred)*
 
 ### Column Headers (Row 4) & Excel AutoFilter:
 Excel **AutoFilter** is automatically enabled across row 4 headers (`A4:F`), enabling 1-click dropdown filtering by hour, node type, packet loss, or TTL.

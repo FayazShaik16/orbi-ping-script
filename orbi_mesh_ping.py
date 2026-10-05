@@ -554,14 +554,17 @@ def main():
         print(f"\n{COLOR_BOLD}{COLOR_CYAN}================================================================{COLOR_RESET}")
         print(f"               {COLOR_BOLD}FINAL MESH PING TEST RESULTS{COLOR_RESET}")
         print(f"{COLOR_BOLD}{COLOR_CYAN}================================================================{COLOR_RESET}")
-        print(f"{'Sheet Name':<25} {'Mesh Node':<14} {'Total Pings':<14} {'Losses':<10}")
-        print("-" * 65)
+        print(f"{'Sheet Name':<25} {'Mesh Node':<14} {'Total Pings':<14} {'Losses':<10} {'Loss Hour(s)':<22}")
+        print("-" * 88)
         for cfg in SHEET_CONFIG:
             s_name = cfg["name"]
-            st = excel_manager.stats.get(s_name, {"total": 0, "losses": 0})
+            st = excel_manager.stats.get(s_name, {"total": 0, "losses": 0, "loss_hours": set()})
             loss_str = f"{COLOR_RED}{st['losses']}{COLOR_RESET}" if st["losses"] > 0 else f"{COLOR_GREEN}0{COLOR_RESET}"
-            print(f"{s_name:<25} {cfg['node_type']:<14} {st['total']:<14} {loss_str:<10}")
-        print("-" * 65)
+            loss_hrs = sorted(st.get("loss_hours", []))
+            hrs_str = ", ".join(f"Hour {h+1}" for h in loss_hrs) if loss_hrs else "None"
+            hrs_color = f"{COLOR_RED}{hrs_str}{COLOR_RESET}" if loss_hrs else f"{COLOR_GREEN}None{COLOR_RESET}"
+            print(f"{s_name:<25} {cfg['node_type']:<14} {st['total']:<14} {loss_str:<10} {hrs_color:<22}")
+        print("-" * 88)
 
         print(f"\n{COLOR_BOLD}{COLOR_GREEN}[✓] Single Master Excel File:{COLOR_RESET} {excel_file}")
         print(f"{COLOR_BOLD}[✓] Raw Flushed CSV Journals:{COLOR_RESET} {session_dir}\n")
