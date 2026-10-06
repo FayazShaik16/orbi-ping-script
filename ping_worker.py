@@ -146,13 +146,14 @@ def run_local_ping_worker(sheet_name, node_type, target, interval, duration, jou
             pass
 
 
-def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh_key, ssh_pass, target, interval, duration, journal_file):
+def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh_key, ssh_pass, target, interval, duration, journal_file, remote_os="windows"):
     """
-    Executes remote pings from Satellite node to target over SSH, streaming and timestamping
+    Executes remote pings from Satellite / Client node to target over SSH, streaming and timestamping
     every line on the local client machine, tracking packet loss, and writing to journal.
+    Supports both Windows (via native PowerShell) and Linux remote hosts.
     """
     print(f"{COLOR_BOLD}{COLOR_CYAN}================================================================{COLOR_RESET}")
-    print(f" {COLOR_BOLD}ORBI MESH PING WORKER - REMOTE SSH STREAM{COLOR_RESET}")
+    print(f" {COLOR_BOLD}ORBI MESH PING WORKER - REMOTE SSH STREAM ({remote_os.upper()}){COLOR_RESET}")
     print(f" Sheet Name     : {COLOR_YELLOW}{sheet_name}{COLOR_RESET}")
     print(f" Mesh Node Type : {COLOR_YELLOW}{node_type}{COLOR_RESET}")
     print(f" SSH Target     : {COLOR_GREEN}{ssh_user}@{ssh_host}:{ssh_port}{COLOR_RESET}")
@@ -161,8 +162,25 @@ def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh
     print(f" Journal Path   : {journal_file}")
     print(f"{COLOR_BOLD}{COLOR_CYAN}================================================================{COLOR_RESET}\n")
 
-    count_param = f"-c {int(duration / interval)}" if duration > 0 else ""
-    remote_cmd = f"ping -i {interval} {count_param} {target}"
+    if str(remote_os).lower() == "windows":
+        interval_ms = max(10, int(interval * 1000))
+        # High precision PowerShell loop that works out of the box on Windows OpenSSH
+        duration_check = f"if($t0.Elapsed.TotalSeconds -ge {duration}){{ break }}; " if duration > 0 else ""
+        ps_script = (
+            f"$target='{target}'; $p=New-Object System.Net.NetworkInformation.Ping; "
+            f"$t0=[System.Diagnostics.Stopwatch]::StartNew(); "
+            f"while($true) {{ "
+            f"{duration_check}"
+            f"try {{ $r=$p.Send($target, 1000); if($r.Status -eq 'Success'){{ "
+            f"Write-Output ('Reply from ' + $target + ': bytes=32 time=' + $r.RoundtripTime + 'ms TTL=' + $r.Options.Ttl) "
+            f"}} else {{ Write-Output ('Request timed out. (Status=' + $r.Status + ')') }} }} "
+            f"catch {{ Write-Output 'Request timed out.' }}; "
+            f"Start-Sleep -Milliseconds {interval_ms} }}"
+        )
+        remote_cmd = f'powershell -NoProfile -Command "{ps_script}"'
+    else:
+        count_param = f"-c {int(duration / interval)}" if duration > 0 else ""
+        remote_cmd = f"ping -i {interval} {count_param} {target}"
 
     ssh_args = [
         "ssh",
@@ -176,9 +194,33 @@ def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh
 
     target_str = f"{ssh_user}@{ssh_host}" if ssh_user else ssh_host
 
-    # Check sshpass
-    if ssh_pass and shutil.which("sshpass"):
-        full_cmd = ["sshpass", "-p", ssh_pass] + ssh_args + [target_str, remote_cmd]
+    # Setup command and password handling (supports sshpass or native OpenSSH SSH_ASKPASS)
+    askpass_file = None
+    proc_env = os.environ.copy()
+    if ssh_pass:
+        if shutil.which("sshpass"):
+            full_cmd = ["sshpass", "-p", ssh_pass] + ssh_args + [target_str, remote_cmd]
+        else:
+            try:
+                import tempfile
+                import stat
+                is_win = platform.system().lower().startswith("win")
+                suffix = ".bat" if is_win else ".sh"
+                sf = tempfile.NamedTemporaryFile("w", delete=False, prefix="askpass_", suffix=suffix)
+                if is_win:
+                    sf.write(f"@echo off\r\necho {ssh_pass}\r\n")
+                else:
+                    sf.write(f'#!/bin/sh\ncat << "EOF"\n{ssh_pass}\nEOF\n')
+                sf.close()
+                if not is_win:
+                    os.chmod(sf.name, stat.S_IRWXU)
+                askpass_file = sf.name
+                proc_env["SSH_ASKPASS"] = askpass_file
+                proc_env["SSH_ASKPASS_REQUIRE"] = "force"
+                proc_env["DISPLAY"] = ":0"
+            except Exception as e:
+                sys.stderr.write(f"[!] Warning: Could not create askpass helper: {e}\n")
+            full_cmd = ssh_args + [target_str, remote_cmd]
     else:
         full_cmd = ssh_args + [target_str, remote_cmd]
 
@@ -191,6 +233,7 @@ def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh
     try:
         proc = subprocess.Popen(
             full_cmd,
+            env=proc_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -249,6 +292,11 @@ def run_ssh_ping_worker(sheet_name, node_type, ssh_host, ssh_user, ssh_port, ssh
     except KeyboardInterrupt:
         print(f"\n{COLOR_YELLOW}[!] Interrupted by user.{COLOR_RESET}")
     finally:
+        if askpass_file and os.path.exists(askpass_file):
+            try:
+                os.unlink(askpass_file)
+            except Exception:
+                pass
         total_time = time.time() - start_time
         loss_pct = ((transmitted - received) / transmitted * 100.0) if transmitted > 0 else 0.0
         print(f"\n{COLOR_BOLD}--- {sheet_name} Summary ---{COLOR_RESET}")
@@ -275,6 +323,7 @@ def main():
     parser.add_argument("--ssh-port", type=int, default=22, help="SSH port")
     parser.add_argument("--ssh-key", default=None, help="SSH private key path")
     parser.add_argument("--ssh-pass", default=None, help="SSH password")
+    parser.add_argument("--remote-os", default="windows", choices=["windows", "linux"], help="Operating System of the remote host")
 
     args = parser.parse_args()
 
@@ -300,6 +349,7 @@ def main():
             interval=args.interval,
             duration=args.duration,
             journal_file=args.journal,
+            remote_os=args.remote_os,
         )
     else:
         run_local_ping_worker(

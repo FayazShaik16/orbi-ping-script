@@ -210,20 +210,32 @@ def parse_args():
     parser.add_argument(
         "--sat1-ip",
         type=str,
-        default="192.168.1.10",
+        default="10.168.168.196",
         help="IP address of Satellite-1 (RBE770).",
     )
     parser.add_argument(
         "--sat2-ip",
         type=str,
-        default="192.168.1.11",
-        help="IP address of Satellite-2 (RBE770).",
+        default="10.168.168.40",
+        help="IP address of Satellite-3 (RBE770, second satellite slot).",
     )
     parser.add_argument(
         "--base-ip",
         type=str,
-        default="192.168.1.1",
+        default="10.168.168.1",
         help="IP address of Base Node (RBE771).",
+    )
+    parser.add_argument(
+        "--client2-ip",
+        type=str,
+        default="10.168.168.49",
+        help="IP of PC 2 wired to Satellite-1 for Tab 5 remote ping (default: 10.168.168.49).",
+    )
+    parser.add_argument(
+        "--client3-ip",
+        type=str,
+        default="10.168.168.188",
+        help="IP of PC 3 wired to Satellite-3 for Tab 6 remote ping (default: 10.168.168.188).",
     )
     parser.add_argument(
         "--client-ip",
@@ -242,14 +254,14 @@ def parse_args():
     parser.add_argument(
         "--ssh-user",
         type=str,
-        default="root",
-        help="SSH username for Satellite nodes.",
+        default="administrator",
+        help="SSH username for remote client/satellite nodes (default: administrator).",
     )
     parser.add_argument(
         "--ssh-port",
         type=int,
         default=22,
-        help="SSH port for Satellite nodes.",
+        help="SSH port for remote nodes.",
     )
     parser.add_argument(
         "--ssh-key",
@@ -260,8 +272,15 @@ def parse_args():
     parser.add_argument(
         "--ssh-pass",
         type=str,
-        default=None,
-        help="SSH password (optional).",
+        default="lanforge",
+        help="SSH password (default: lanforge).",
+    )
+    parser.add_argument(
+        "--ssh-remote-os",
+        type=str,
+        default="windows",
+        choices=["windows", "linux"],
+        help="Operating System of the remote machines (Windows uses native PowerShell ping).",
     )
 
     # Output options
@@ -320,19 +339,29 @@ def prompt_interactive(args):
         except ValueError:
             pass
 
-    sat1_input = input(f"\n[4] Satellite-1 IP [{args.sat1_ip}]: ").strip()
+    sat1_input = input(f"\n[4] Satellite-1 Mesh Node IP [{args.sat1_ip}]: ").strip()
     if sat1_input:
         args.sat1_ip = sat1_input
 
-    sat2_input = input(f"[5] Satellite-2 IP [{args.sat2_ip}]: ").strip()
+    sat2_input = input(f"[5] Satellite-3 Mesh Node IP [{args.sat2_ip}]: ").strip()
     if sat2_input:
         args.sat2_ip = sat2_input
 
-    ssh_user_input = input(f"\n[6] Satellite SSH Username [{args.ssh_user}]: ").strip()
+    c2_default = args.client2_ip or args.sat1_ip
+    c2_input = input(f"\n[6] PC 2 (wired to Sat-1) IP for remote ping [{c2_default}]: ").strip()
+    if c2_input:
+        args.client2_ip = c2_input
+
+    c3_default = args.client3_ip or args.sat2_ip
+    c3_input = input(f"[7] PC 3 (wired to Sat-3) IP for remote ping [{c3_default}]: ").strip()
+    if c3_input:
+        args.client3_ip = c3_input
+
+    ssh_user_input = input(f"\n[8] Remote PC SSH Username [{args.ssh_user}]: ").strip()
     if ssh_user_input:
         args.ssh_user = ssh_user_input
 
-    ssh_pass_input = input(f"[7] Satellite SSH Password (leave blank if SSH key / manual login): ").strip()
+    ssh_pass_input = input(f"[9] Remote PC SSH Password [{args.ssh_pass}]: ").strip()
     if ssh_pass_input:
         args.ssh_pass = ssh_pass_input
 
@@ -442,12 +471,12 @@ def main():
             "target": args.internet_ip,
             "ssh_host": None,
         },
-        # Tab 2: Local Base Client -> Itself
+        # Tab 2: Local Base Client -> Base Node IP
         {
             "sheet": "Base_Self",
             "node_type": "Base",
-            "title": "Tab2: Base -> Self",
-            "target": local_ip,
+            "title": "Tab2: Base -> Base Node",
+            "target": args.base_ip,
             "ssh_host": None,
         },
         # Tab 3: Local Base Client -> Satellite-1
@@ -458,29 +487,29 @@ def main():
             "target": args.sat1_ip,
             "ssh_host": None,
         },
-        # Tab 4: Local Base Client -> Satellite-2
+        # Tab 4: Local Base Client -> Satellite-3
         {
             "sheet": "Base_Satellite2",
             "node_type": "Base",
-            "title": "Tab4: Base -> Satellite2",
+            "title": "Tab4: Base -> Sat3",
             "target": args.sat2_ip,
             "ssh_host": None,
         },
-        # Tab 5: Satellite-1 (via SSH) -> Internet
+        # Tab 5: PC 2 / Satellite-1 (via SSH) -> Internet
         {
             "sheet": "Satellite1_Internet",
             "node_type": "Satellite1",
-            "title": "Tab5: Sat1 (SSH) -> Internet",
+            "title": "Tab5: PC2(Sat1) -> Internet" if args.client2_ip else "Tab5: Sat1 (SSH) -> Internet",
             "target": args.internet_ip,
-            "ssh_host": args.sat1_ip,
+            "ssh_host": args.client2_ip or args.sat1_ip,
         },
-        # Tab 6: Satellite-2 (via SSH) -> Internet
+        # Tab 6: PC 3 / Satellite-3 (via SSH) -> Internet
         {
             "sheet": "Satellite2_Internet",
             "node_type": "Satellite2",
-            "title": "Tab6: Sat2 (SSH) -> Internet",
+            "title": "Tab6: PC3(Sat3) -> Internet" if args.client3_ip else "Tab6: Sat3 (SSH) -> Internet",
             "target": args.internet_ip,
-            "ssh_host": args.sat2_ip,
+            "ssh_host": args.client3_ip or args.sat2_ip,
         },
     ]
 
@@ -503,9 +532,11 @@ def main():
         if tab["ssh_host"]:
             cmd += [
                 f'--ssh-host "{tab["ssh_host"]}"',
-                f'--ssh-user "{args.ssh_user}"',
                 f'--ssh-port {args.ssh_port}',
+                f'--remote-os "{args.ssh_remote_os}"',
             ]
+            if args.ssh_user:
+                cmd.append(f'--ssh-user "{args.ssh_user}"')
             if args.ssh_key:
                 cmd.append(f'--ssh-key "{args.ssh_key}"')
             if args.ssh_pass:

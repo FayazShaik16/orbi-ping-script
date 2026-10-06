@@ -27,11 +27,11 @@ Cross-platform testbed orchestration tool that opens **6 concurrent terminal ses
                 MAIN CLIENT (Connected to Base Node)
 ===============================================================
   Tab 1: Base Client -> 8.8.8.8 (Internet)
-  Tab 2: Base Client -> Local Client IP (Self Ping)
-  Tab 3: Base Client -> Satellite-1 IP
-  Tab 4: Base Client -> Satellite-2 IP
-  Tab 5: Satellite-1 (via SSH) -> 8.8.8.8 (Internet)
-  Tab 6: Satellite-2 (via SSH) -> 8.8.8.8 (Internet)
+  Tab 2: Base Client -> Base Node IP (10.168.168.1)
+  Tab 3: Base Client -> Satellite-1 IP (10.168.168.196)
+  Tab 4: Base Client -> Satellite-3 IP (10.168.168.40)
+  Tab 5: PC 2 (wired to Sat-1, via SSH) -> 8.8.8.8 (Internet)
+  Tab 6: PC 3 (wired to Sat-3, via SSH) -> 8.8.8.8 (Internet)
 ===============================================================
              || (Simultaneous & Real-Time Sync)
              \/
@@ -129,13 +129,16 @@ python3 orbi_mesh_ping.py --duration 0
 
 ### Full Example with Options:
 ```bash
-python3 orbi_mesh_ping.py \
-  --os macos \
+python orbi_mesh_ping.py \
+  --os windows \
   --duration 2h \
   --interval 0.1 \
-  --sat1-ip 192.168.1.10 \
-  --sat2-ip 192.168.1.11 \
-  --ssh-user root \
+  --base-ip 10.168.168.1 \
+  --sat1-ip 10.168.168.196 \
+  --sat2-ip 10.168.168.40 \
+  --client2-ip 10.168.168.49 \
+  --client3-ip 10.168.168.188 \
+  --ssh-user Administrator \
   --log-dir ./ping_logs
 ```
 
@@ -144,15 +147,18 @@ python3 orbi_mesh_ping.py \
   --os {macos,linux,windows}   Operating System of Main Client (default: auto-detected)
   --interval INTERVAL          Ping interval in seconds (default: 0.1 = 100ms)
   --duration DURATION          Ping duration: e.g. 2h (2 hours), 1.5h, 30m, 120s, or 0 (continuous)
-  --sat1-ip SAT1_IP            IP address of Satellite-1 (default: 192.168.1.10)
-  --sat2-ip SAT2_IP            IP address of Satellite-2 (default: 192.168.1.11)
-  --base-ip BASE_IP            IP address of Base Node (default: 192.168.1.1)
+  --sat1-ip SAT1_IP            IP address of Satellite-1 (default: 10.168.168.196)
+  --sat2-ip SAT2_IP            IP address of Satellite-3 (default: 10.168.168.40)
+  --base-ip BASE_IP            IP address of Base Node (default: 10.168.168.1)
+  --client2-ip CLIENT2_IP      IP of PC 2 wired to Sat-1 (default: 10.168.168.49)
+  --client3-ip CLIENT3_IP      IP of PC 3 wired to Sat-3 (default: 10.168.168.188)
   --client-ip CLIENT_IP        Self IP to ping (defaults to auto-detected local IP)
   --internet-ip INTERNET_IP    Internet target to ping (default: 8.8.8.8)
-  --ssh-user SSH_USER          SSH username for satellites (default: root)
+  --ssh-user SSH_USER          SSH username for remote client PCs
   --ssh-port SSH_PORT          SSH port (default: 22)
   --ssh-key SSH_KEY            Path to SSH private key file
   --ssh-pass SSH_PASS          SSH password (optional)
+  --ssh-remote-os {windows,linux} Remote OS of clients (default: windows)
   --log-dir LOG_DIR            Folder to store session journals and Excel reports
   --excel-file EXCEL_FILE      Custom filename/path for output Excel file
   --sync-excel JOURNAL_DIR     Rebuild/recover Excel report from an existing journal folder

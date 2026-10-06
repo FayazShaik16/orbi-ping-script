@@ -34,7 +34,7 @@ except ImportError:
 
 SHEET_CONFIG = [
     {"name": "Base_Internet", "node_type": "Base", "title": "Base Node Client -> Internet (8.8.8.8)"},
-    {"name": "Base_Self", "node_type": "Base", "title": "Base Node Client -> Self (Local IP)"},
+    {"name": "Base_Self", "node_type": "Base", "title": "Base Node Client -> Base Node IP (10.168.168.1)"},
     {"name": "Base_Satellite1", "node_type": "Base", "title": "Base Node Client -> Satellite-1 IP"},
     {"name": "Base_Satellite2", "node_type": "Base", "title": "Base Node Client -> Satellite-2 IP"},
     {"name": "Satellite1_Internet", "node_type": "Satellite1", "title": "Satellite-1 (SSH) -> Internet (8.8.8.8)"},
