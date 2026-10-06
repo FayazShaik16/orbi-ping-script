@@ -72,17 +72,19 @@ At the start of every 1-hour window, a styled divider banner row is inserted acr
 - **Content**: `=== HOUR <N> (<Start_Time> - <End_Time>) ===`
 - **Filter-Compatible**: Unmerged cells ensure full compatibility with Excel AutoFilter, sorting, and keyboard navigation.
 
-### Hourly Breakdown Table & Bar Graph (Bottom of Sheet):
-At the bottom of each sheet, a 1-hour breakdown table and a native Excel Bar Chart are automatically generated:
+### Executive Bar Graph (Top of Sheet, Cell H1):
+- **Native Excel Bar Graph**:
+  - Positioned at **`H1` at the top of each sheet**, directly beside the executive packet loss stats for instant visibility without scrolling.
+  - Visualizes the average packet loss percentage for each 1-hour interval.
+  - **Fixed Y-Axis Scale**: Ranged from **0% to 100%** with **10%** major step intervals (`0%`, `10%`, `20%` ... `100%`) for standardized, consistent visual comparisons across all sheets and tests.
+  - Each bar includes value labels (`0%`, `10%`, etc.) directly on the bars.
+
+### Hourly Breakdown Table (Bottom of Sheet):
 - **Hourly Breakdown Table**:
   - `Hour Window` (e.g. `Hour 1 (18:00 - 19:00)`, `Hour 2 (19:00 - 20:00)`)
   - `Total Pings`
   - `Loss Count`
-  - `Avg Packet Loss (%)`
-- **Native Excel Bar Graph**:
-  - Visualizes the average packet loss percentage for each 1-hour interval.
-  - **Fixed Y-Axis Scale**: Ranged from **0% to 100%** with **10%** major step intervals (`0%`, `10%`, `20%` ... `100%`) for standardized, consistent visual comparisons across all sheets and tests.
-  - Placed right below the hourly table for executive reporting and visual analysis.
+  - `Avg Packet Loss (%)` (highlighted green if 0%, red if losses occurred)
 
 ---
 

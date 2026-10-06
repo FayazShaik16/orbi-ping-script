@@ -157,6 +157,7 @@ class ExcelSyncManager:
                 ws.column_dimensions["D"].width = 15
                 ws.column_dimensions["E"].width = 22
                 ws.column_dimensions["F"].width = 65
+                ws.column_dimensions["G"].width = 3
                 ws.freeze_panes = "A5"
                 ws.auto_filter.ref = "A4:F4"
 
@@ -409,7 +410,7 @@ class ExcelSyncManager:
         """
         Performs final sync, appends the Hourly Packet Loss Breakdown table,
         and generates a native Bar Chart showing average packet loss for each 1 hour
-        at the bottom of each sheet.
+        anchored at H1 (top of sheet, beside the executive packet loss stats).
         """
         self.sync_once()
 
@@ -494,7 +495,11 @@ class ExcelSyncManager:
             chart.add_data(data_ref, titles_from_data=True)
             chart.set_categories(cats_ref)
 
-            chart_cell = f"A{summary_end_row + 2}"
+            # Clear previous charts to prevent duplicates on reruns
+            ws._charts = []
+
+            # Place Bar Chart at H1 at the top of the sheet, directly beside the executive packet loss stats
+            chart_cell = "H1"
             ws.add_chart(chart, chart_cell)
 
         self._atomic_save()
