@@ -86,10 +86,13 @@ def launch_macos_terminal(commands, titles=None):
 
 def launch_linux_terminal(commands, titles):
     """
-    Launches commands on Linux using gnome-terminal (tabs), tmux, or xterm.
+    Launches commands on Linux using gnome-terminal (tabs), GUI terminal emulators,
+    tmux session (for headless/SSH sessions), or background subprocesses.
     """
-    # 1. Try gnome-terminal with tabs
-    if shutil.which("gnome-terminal"):
+    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+    # 1. If GUI is available, try GNOME Terminal tabs
+    if has_display and shutil.which("gnome-terminal"):
         print("[*] Launching with gnome-terminal tabs...")
         args = ["gnome-terminal"]
         for idx, (cmd, title) in enumerate(zip(commands, titles)):
@@ -97,7 +100,7 @@ def launch_linux_terminal(commands, titles):
         subprocess.Popen(args)
         return
 
-    # 2. Try tmux
+    # 2. Try tmux (works both in GUI and headless/SSH environments)
     if shutil.which("tmux"):
         session_name = f"orbi_ping_{int(time.time())}"
         print(f"[*] Launching with tmux session '{session_name}'...")
@@ -105,21 +108,28 @@ def launch_linux_terminal(commands, titles):
         for cmd, title in zip(commands[1:], titles[1:]):
             subprocess.run(["tmux", "new-window", "-t", session_name, "-n", title, cmd])
         print(f"[*] Attach to sessions using: tmux attach -t {session_name}")
-        if shutil.which("xterm"):
+        if has_display and shutil.which("xterm"):
             subprocess.Popen(["xterm", "-e", f"tmux attach -t {session_name}"])
         return
 
-    # 3. Fallback to individual windows (xfce4-terminal, konsole, or xterm)
-    term_bin = shutil.which("xfce4-terminal") or shutil.which("konsole") or shutil.which("xterm")
-    if term_bin:
-        print(f"[*] Launching windows using {term_bin}...")
-        for cmd in commands:
-            subprocess.Popen([term_bin, "-e", f"bash -c '{cmd}; exec bash'"])
-        return
+    # 3. Fallback to individual GUI terminal windows
+    if has_display:
+        term_bin = (
+            shutil.which("xfce4-terminal")
+            or shutil.which("mate-terminal")
+            or shutil.which("konsole")
+            or shutil.which("xterm")
+        )
+        if term_bin:
+            print(f"[*] Launching windows using {term_bin}...")
+            for cmd in commands:
+                subprocess.Popen([term_bin, "-e", f"bash -c '{cmd}; exec bash'"])
+            return
 
-    print("[!] No supported terminal emulator detected. Run commands manually:")
+    # 4. Headless background fallback (e.g. headless Linux server, SSH)
+    print("[*] Running 6 worker sessions as background processes...")
     for cmd in commands:
-        print(f"    {cmd}")
+        subprocess.Popen(["bash", "-c", cmd])
 
 
 def launch_windows_terminal(commands, titles):
