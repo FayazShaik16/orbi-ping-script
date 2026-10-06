@@ -471,22 +471,25 @@ class ExcelSyncManager:
             chart.type = "col"
             chart.style = 10
             chart.title = f"Average Packet Loss per 1 Hour - {sheet_name}"
-            chart.y_axis.title = "Packet Loss (%)"
             chart.x_axis.title = "1-Hour Time Window"
+            chart.y_axis.title = None
             chart.legend = None
             chart.width = 18
             chart.height = 11
 
-            # Exact Y-Axis Range: Min 0, Max 100, Major Steps 10, Minor Steps 1
+            # Exact Y-Axis Range: Min 0, Max 100
             chart.y_axis.scaling.min = 0
             chart.y_axis.scaling.max = 100
-            chart.y_axis.majorUnit = 10
-            chart.y_axis.minorUnit = 1
-            chart.y_axis.tickLblPos = "nextTo"
-            chart.y_axis.delete = False
-            chart.y_axis.number_format = '0'
+            # Remove Y-axis labels and axis line
+            chart.y_axis.delete = True
 
-            # Value labels on bars
+            # Hide all grid lines totally across all axes
+            chart.y_axis.majorGridlines = None
+            chart.y_axis.minorGridlines = None
+            chart.x_axis.majorGridlines = None
+            chart.x_axis.minorGridlines = None
+
+            # Value labels directly on bars
             chart.dataLabels = DataLabelList()
             chart.dataLabels.showVal = True
 

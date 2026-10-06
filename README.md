@@ -76,8 +76,9 @@ At the start of every 1-hour window, a styled divider banner row is inserted acr
 - **Native Excel Bar Graph**:
   - Positioned at **`H1` at the top of each sheet**, directly beside the executive packet loss stats for instant visibility without scrolling.
   - Visualizes the average packet loss percentage for each 1-hour interval.
-  - **Fixed Y-Axis Scale**: Ranged from **0% to 100%** with **10%** major step intervals (`0%`, `10%`, `20%` ... `100%`) for standardized, consistent visual comparisons across all sheets and tests.
-  - Each bar includes value labels (`0%`, `10%`, etc.) directly on the bars.
+  - **Clean & Distraction-Free**: Y-axis labels and all grid lines are completely hidden across all OS and Excel versions for a modern executive presentation.
+  - **Fixed 0%–100% Scale**: All bars scale proportionally from 0% to 100%.
+  - **Direct Data Labels**: Each bar displays its exact percentage value (`0%`, `10%`, etc.) directly on top of the bar.
 
 ### Hourly Breakdown Table (Bottom of Sheet):
 - **Hourly Breakdown Table**:
