@@ -423,9 +423,12 @@ class ExcelSyncManager:
             if not hourly_buckets:
                 continue
 
-            # Add spacing and Hourly Summary section at bottom of sheet
+            # Filter buckets for the chart (only hours with packet losses)
+            loss_buckets = [b for b in hourly_buckets if b[2] > 0]
+
+            # Add spacing and Hourly Loss Breakdown section at bottom of sheet - Feeds the Top Chart
             ws.append([])
-            ws.append(["--- HOURLY PACKET LOSS BREAKDOWN (1 HOUR INTERVALS) ---", "", "", ""])
+            ws.append(["--- HOURLY PACKET LOSS BREAKDOWN (LOSS HOURS ONLY) ---", "", "", ""])
             title_row = ws.max_row
             ws.cell(row=title_row, column=1).font = Font(name="Calibri", size=11, bold=True, color="1F4E79")
 
@@ -442,20 +445,35 @@ class ExcelSyncManager:
                 cell.fill = header_fill
                 cell.alignment = Alignment(horizontal="center" if col_idx in [2, 3, 4] else "left")
 
-            # Append hourly data rows
+            # Append hourly data rows for chart
             data_start_row = header_row + 1
-            for label, total, losses, loss_pct in hourly_buckets:
-                ws.append([label, total, losses, loss_pct])
+            if not loss_buckets:
+                tot_pings = sum(b[1] for b in hourly_buckets)
+                ws.append(["All Hours (0% Loss)", tot_pings, 0, 0.0])
                 curr_row = ws.max_row
                 ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="left")
                 ws.cell(row=curr_row, column=2).alignment = Alignment(horizontal="center")
                 ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
-                cell_pct = ws.cell(row=curr_row, column=4)
-                cell_pct.alignment = Alignment(horizontal="center")
-                if losses > 0:
+                c_pct = ws.cell(row=curr_row, column=4)
+                c_pct.alignment = Alignment(horizontal="center")
+                c_pct.font = Font(name="Calibri", size=11, bold=True, color="27AE60")
+            else:
+                for label, total, losses, loss_pct in loss_buckets:
+                    # Clean compact label: extract "Hour X (HH:MM)" from "Hour X (HH:MM - HH:MM)"
+                    if " (" in label and " - " in label:
+                        h_part, t_part = label.split(" (", 1)
+                        s_time = t_part.split(" - ")[0]
+                        clean_label = f"{h_part} ({s_time})"
+                    else:
+                        clean_label = label
+                    ws.append([clean_label, total, losses, loss_pct])
+                    curr_row = ws.max_row
+                    ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="left")
+                    ws.cell(row=curr_row, column=2).alignment = Alignment(horizontal="center")
+                    ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
+                    cell_pct = ws.cell(row=curr_row, column=4)
+                    cell_pct.alignment = Alignment(horizontal="center")
                     cell_pct.font = Font(name="Calibri", size=11, bold=True, color="C0392B")
-                else:
-                    cell_pct.font = Font(name="Calibri", size=11, bold=True, color="27AE60")
 
             summary_end_row = ws.max_row
 
@@ -463,12 +481,15 @@ class ExcelSyncManager:
             chart = BarChart()
             chart.type = "col"
             chart.style = 10
-            chart.title = f"Average Packet Loss per 1 Hour - {sheet_name}"
+            if not loss_buckets:
+                chart.title = f"Average Packet Loss per 1 Hour - {sheet_name} (0% Loss)"
+            else:
+                chart.title = f"Average Packet Loss per 1 Hour - {sheet_name} (Loss Hours Only)"
             chart.x_axis.title = "1-Hour Time Window"
             chart.y_axis.title = None
             chart.legend = None
-            chart.width = 18
-            chart.height = 11
+            chart.width = 24
+            chart.height = 12
 
             # Exact Y-Axis Range: Min 0, Max 100
             chart.y_axis.scaling.min = 0
@@ -481,6 +502,10 @@ class ExcelSyncManager:
             chart.y_axis.minorGridlines = None
             chart.x_axis.majorGridlines = None
             chart.x_axis.minorGridlines = None
+
+            # Prevent Excel from skipping any category labels or tick marks
+            chart.x_axis.tickLblSkip = 1
+            chart.x_axis.tickMarkSkip = 1
 
             # Value labels directly on bars
             chart.dataLabels = DataLabelList()
@@ -497,6 +522,34 @@ class ExcelSyncManager:
             # Place Bar Chart at H1 at the top of the sheet, directly beside the executive packet loss stats
             chart_cell = "H1"
             ws.add_chart(chart, chart_cell)
+
+            # Complete Benchmark Log (All Hours) appended below for complete reference
+            ws.append([])
+            ws.append(["--- COMPLETE BENCHMARK LOG (ALL HOURS) ---", "", "", ""])
+            t2_row = ws.max_row
+            ws.cell(row=t2_row, column=1).font = Font(name="Calibri", size=11, bold=True, color="1F4E79")
+
+            table2_header = ["Hour Window", "Total Pings", "Loss Count", "Avg Packet Loss (%)"]
+            ws.append(table2_header)
+            header2_row = ws.max_row
+            for col_idx in range(1, 5):
+                cell = ws.cell(row=header2_row, column=col_idx)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center" if col_idx in [2, 3, 4] else "left")
+
+            for label, total, losses, loss_pct in hourly_buckets:
+                ws.append([label, total, losses, loss_pct])
+                curr_row = ws.max_row
+                ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="left")
+                ws.cell(row=curr_row, column=2).alignment = Alignment(horizontal="center")
+                ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
+                c_pct = ws.cell(row=curr_row, column=4)
+                c_pct.alignment = Alignment(horizontal="center")
+                if losses > 0:
+                    c_pct.font = Font(name="Calibri", size=11, bold=True, color="C0392B")
+                else:
+                    c_pct.font = Font(name="Calibri", size=11, bold=True, color="27AE60")
 
         self._atomic_save()
         return self.stats

@@ -250,9 +250,12 @@ def rebuild_workbook(log_dir, output_paths):
             ws["F2"] = full_str if len(full_str) <= 60 else ", ".join(f"Hour {h + 1}" for h in loss_hrs_sorted)
             ws["F2"].font = red_font
 
-        # Append Hourly Breakdown Table at the bottom
+        # Collect only the hours with packet losses
+        loss_h_indices = [h for h in sorted(hourly_stats.keys()) if hourly_stats[h]["losses"] > 0]
+
+        # Append Hourly Packet Loss Breakdown Table (Loss Hours Only) - Feeds the Top Chart
         ws.append([])
-        ws.append(["--- HOURLY PACKET LOSS BREAKDOWN (1 HOUR INTERVALS) ---", "", "", ""])
+        ws.append(["--- HOURLY PACKET LOSS BREAKDOWN (LOSS HOURS ONLY) ---", "", "", ""])
         t_row = ws.max_row
         ws.cell(row=t_row, column=1).font = Font(name="Calibri", size=11, bold=True, color="1F4E79")
 
@@ -266,6 +269,90 @@ def rebuild_workbook(log_dir, output_paths):
             c.alignment = align_center if col_idx in [2, 3, 4] else Alignment(horizontal="left")
 
         data_start_row = header_row + 1
+        if not loss_h_indices:
+            # Sheet had 0 losses across all hours
+            ws.append(["All Hours (0% Loss)", total_pings, 0, 0.0])
+            curr_row = ws.max_row
+            ws.cell(row=curr_row, column=2).alignment = align_center
+            ws.cell(row=curr_row, column=3).alignment = align_center
+            c_pct = ws.cell(row=curr_row, column=4)
+            c_pct.alignment = align_center
+            c_pct.font = green_font
+        else:
+            for h_idx in loss_h_indices:
+                st = hourly_stats[h_idx]
+                s_t = st["start"].strftime("%H:%M") if st["start"] else ""
+                lbl = f"Hour {h_idx + 1} ({s_t})" if s_t else f"Hour {h_idx + 1}"
+                h_tot = st["total"]
+                h_loss = st["losses"]
+                h_pct = (h_loss / h_tot * 100.0) if h_tot > 0 else 0.0
+
+                ws.append([lbl, h_tot, h_loss, round(h_pct, 2)])
+                curr_row = ws.max_row
+                ws.cell(row=curr_row, column=2).alignment = align_center
+                ws.cell(row=curr_row, column=3).alignment = align_center
+                c_pct = ws.cell(row=curr_row, column=4)
+                c_pct.alignment = align_center
+                c_pct.font = red_font if h_loss > 0 else green_font
+
+        summary_end_row = ws.max_row
+
+        # Build Bar Chart anchored at H1 (top of sheet beside stats)
+        chart = BarChart()
+        chart.type = "col"
+        chart.style = 10
+        if not loss_h_indices:
+            chart.title = f"Average Packet Loss per 1 Hour - {s_name} (0% Loss)"
+        else:
+            chart.title = f"Average Packet Loss per 1 Hour - {s_name} (Loss Hours Only)"
+        chart.x_axis.title = "1-Hour Time Window"
+        chart.y_axis.title = None
+        chart.legend = None
+        chart.width = 24
+        chart.height = 12
+
+        # Fixed 0% - 100% scale
+        chart.y_axis.scaling.min = 0
+        chart.y_axis.scaling.max = 100
+        # Remove Y-axis labels
+        chart.y_axis.delete = True
+
+        # Hide all gridlines totally
+        chart.y_axis.majorGridlines = None
+        chart.y_axis.minorGridlines = None
+        chart.x_axis.majorGridlines = None
+        chart.x_axis.minorGridlines = None
+
+        # Ensure all category labels and ticks are rendered without skipping
+        chart.x_axis.tickLblSkip = 1
+        chart.x_axis.tickMarkSkip = 1
+
+        # Direct value labels on bars
+        chart.dataLabels = DataLabelList()
+        chart.dataLabels.showVal = True
+
+        data_ref = Reference(ws, min_col=4, min_row=header_row, max_row=summary_end_row)
+        cats_ref = Reference(ws, min_col=1, min_row=data_start_row, max_row=summary_end_row)
+        chart.add_data(data_ref, titles_from_data=True)
+        chart.set_categories(cats_ref)
+
+        ws.add_chart(chart, "H1")
+
+        # Full 12-Hour Benchmark Table (All Hours) appended below for complete reference
+        ws.append([])
+        ws.append(["--- COMPLETE 12-HOUR BENCHMARK LOG (ALL HOURS) ---", "", "", ""])
+        t2_row = ws.max_row
+        ws.cell(row=t2_row, column=1).font = Font(name="Calibri", size=11, bold=True, color="1F4E79")
+
+        table2_header = ["Hour Window", "Total Pings", "Loss Count", "Avg Packet Loss (%)"]
+        ws.append(table2_header)
+        header2_row = ws.max_row
+        for col_idx in range(1, 5):
+            c = ws.cell(row=header2_row, column=col_idx)
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = align_center if col_idx in [2, 3, 4] else Alignment(horizontal="left")
+
         for h_idx in sorted(hourly_stats.keys()):
             st = hourly_stats[h_idx]
             s_t = st["start"].strftime("%H:%M") if st["start"] else ""
@@ -282,42 +369,6 @@ def rebuild_workbook(log_dir, output_paths):
             c_pct = ws.cell(row=curr_row, column=4)
             c_pct.alignment = align_center
             c_pct.font = red_font if h_loss > 0 else green_font
-
-        summary_end_row = ws.max_row
-
-        # Build Bar Chart anchored at H1 (top of sheet beside stats)
-        chart = BarChart()
-        chart.type = "col"
-        chart.style = 10
-        chart.title = f"Average Packet Loss per 1 Hour - {s_name}"
-        chart.x_axis.title = "1-Hour Time Window"
-        chart.y_axis.title = None
-        chart.legend = None
-        chart.width = 18
-        chart.height = 11
-
-        # Fixed 0% - 100% scale
-        chart.y_axis.scaling.min = 0
-        chart.y_axis.scaling.max = 100
-        # Remove Y-axis labels
-        chart.y_axis.delete = True
-
-        # Hide all gridlines totally
-        chart.y_axis.majorGridlines = None
-        chart.y_axis.minorGridlines = None
-        chart.x_axis.majorGridlines = None
-        chart.x_axis.minorGridlines = None
-
-        # Direct value labels on bars
-        chart.dataLabels = DataLabelList()
-        chart.dataLabels.showVal = True
-
-        data_ref = Reference(ws, min_col=4, min_row=header_row, max_row=summary_end_row)
-        cats_ref = Reference(ws, min_col=1, min_row=data_start_row, max_row=summary_end_row)
-        chart.add_data(data_ref, titles_from_data=True)
-        chart.set_categories(cats_ref)
-
-        ws.add_chart(chart, "H1")
 
         sheet_elapsed = time.time() - sheet_start
         print(f"  [✓] '{s_name}': {total_pings:,} pings | {total_losses} losses ({loss_pct:.2f}%) | {len(hourly_stats)} hours processed in {sheet_elapsed:.1f}s")
