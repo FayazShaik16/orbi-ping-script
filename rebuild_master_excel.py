@@ -48,6 +48,8 @@ def rebuild_workbook(log_dir, output_paths):
     val_font = Font(name="Calibri", size=11, bold=True)
     green_font = Font(name="Calibri", size=11, bold=True, color="27AE60")
     red_font = Font(name="Calibri", size=11, bold=True, color="C0392B")
+    loss_row_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    loss_row_font = Font(name="Calibri", size=10, bold=True, color="9C0006")
 
     thin_border = Border(
         left=Side(style="thin", color="CCCCCC"),
@@ -220,7 +222,11 @@ def rebuild_workbook(log_dir, output_paths):
                 # Append data row
                 ws.append([ts_val, hour_label, node_val, loss_out, ttl_out, str_val])
                 if is_loss:
-                    ws.cell(row=ws.max_row, column=4).font = red_font
+                    loss_r_idx = ws.max_row
+                    for c_idx in range(1, len(HEADER_COLUMNS) + 1):
+                        c_cell = ws.cell(row=loss_r_idx, column=c_idx)
+                        c_cell.fill = loss_row_fill
+                        c_cell.font = loss_row_font
 
         # AutoFilter over all data rows
         data_end_row = ws.max_row

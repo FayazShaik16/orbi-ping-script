@@ -62,6 +62,8 @@ class ExcelSyncManager:
         self.align_center = Alignment(horizontal="center", vertical="center")
         self.align_left = Alignment(horizontal="left", vertical="center")
         self.font_loss = Font(name="Calibri", size=11, bold=True, color="C0392B")
+        self.loss_row_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        self.loss_row_font = Font(name="Calibri", size=10, bold=True, color="9C0006")
 
         self.sep_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
         self.sep_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
@@ -315,7 +317,11 @@ class ExcelSyncManager:
                         # Append data row: [Time stamp, Hour, Mesh Node Type, PacketLoss, TTL, String]
                         ws.append([ts_val, hour_label, node_val, loss_out, ttl_out, str_val])
                         if loss_out != 0 and loss_clean != "0":
-                            ws.cell(row=ws.max_row, column=4).font = self.font_loss
+                            loss_r_idx = ws.max_row
+                            for c_idx in range(1, len(HEADER_COLUMNS) + 1):
+                                c_cell = ws.cell(row=loss_r_idx, column=c_idx)
+                                c_cell.fill = self.loss_row_fill
+                                c_cell.font = self.loss_row_font
 
                         total_new_rows += 1
 
