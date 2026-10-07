@@ -314,15 +314,8 @@ class ExcelSyncManager:
 
                         # Append data row: [Time stamp, Hour, Mesh Node Type, PacketLoss, TTL, String]
                         ws.append([ts_val, hour_label, node_val, loss_out, ttl_out, str_val])
-                        curr_row = ws.max_row
-
-                        ws.cell(row=curr_row, column=2).alignment = self.align_center
-                        ws.cell(row=curr_row, column=3).alignment = self.align_center
-                        cell_loss = ws.cell(row=curr_row, column=4)
-                        cell_loss.alignment = self.align_center
                         if loss_out != 0 and loss_clean != "0":
-                            cell_loss.font = self.font_loss
-                        ws.cell(row=curr_row, column=5).alignment = self.align_center
+                            ws.cell(row=ws.max_row, column=4).font = self.font_loss
 
                         total_new_rows += 1
 
