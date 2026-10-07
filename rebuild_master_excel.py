@@ -393,8 +393,11 @@ def rebuild_workbook(log_dir, output_paths):
 
 if __name__ == "__main__":
     log_dir = sys.argv[1] if len(sys.argv) > 1 else "/Users/fayazshaik/Documents/Candela/Script-Ping/ping_logs"
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     out_paths = [
         "/Users/fayazshaik/Downloads/orbi_mesh_ping_20261006_185424.xlsx",
         os.path.join(log_dir, "orbi_mesh_ping_20261006_185424.xlsx"),
+        os.path.join(script_dir, "orbi_mesh_ping_20261006_185424.xlsx"),
     ]
     rebuild_workbook(log_dir, out_paths)
+
